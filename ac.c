@@ -120,7 +120,7 @@ int build_trie(char *str, ac_struct *ac)
             else
             {
                 printf("Duplicate keyword \"%s\"\n", n->pattern);
-                return -1;
+                //return -1;
             }
         }
     }
@@ -219,7 +219,7 @@ void ac_free(ac_struct *acs)
     free(acs);
 }
 
-int ac_search(char *str, ac_struct *acs)
+int ac_search(char *str, ac_struct *acs, void (*call_back_f)(char* pattern, int pos))
 {
     if(!acs || !acs->is_finalized)
         return -1;
@@ -238,14 +238,16 @@ int ac_search(char *str, ac_struct *acs)
         {
             acs->current = n; 
 
-            if(n->failure->is_final)
+            if(n->failure->is_final) // hit, do something cool here
             {
-                printf("hit %s at %d\n", n->failure->pattern, acs->counter);
+				if(call_back_f)
+					(*call_back_f)(n->failure->pattern, acs->counter);
             }
         
-            if(n->is_final)
+            if(n->is_final) // hit, do something cool here
             {
-                printf("hit %s at %d\n", n->pattern, acs->counter);
+				if(call_back_f)
+					(*call_back_f)(n->pattern, acs->counter);
             }
         }
         else
