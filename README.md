@@ -19,3 +19,6 @@ Search
 
 While doing searching, we read the input file by each character and, accordingly, transit the DFA state. 
 Then at every state we transited to, check if the current node or the failure node of the current node is a final state, if so, generate hit event.
+
+TODO
+=====
