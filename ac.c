@@ -12,6 +12,7 @@ struct AC_W_NODE_
     int is_final;
     char* pattern;
     char key;
+	int id;
 };
 
 struct AC_STRUCT_
@@ -22,59 +23,55 @@ struct AC_STRUCT_
     int counter;
 };
 
-int ac_init(ac_struct** acs)
+static inline ac_w_node* trie_node_get_children_head(ac_w_node* n)
 {
-    *acs = (ac_struct*) malloc(sizeof(ac_struct));
-    if(!*acs)
-        return -1;
-    ac_struct* ac = *acs;
-    ac->is_finalized = 0;
-    ac->counter = 0;
-    ac->root = (ac_w_node*) malloc(sizeof(ac_w_node));
-    if(!ac->root)
-    {
-        free(*acs);
-        return -1;
-    }
-    ac->root->next_list = NULL;
-    ac->root->next_one = NULL;
-    ac->root->failure = ac->root;
-    ac->root->key = 0;
-    ac->root->is_final = 0;
-    ac->current = ac->root;
-    
-    return 0;
+	return n->next_list;
 }
 
-ac_w_node* get_next_node(ac_w_node* n, char ch)
+static inline ac_w_node* trie_node_get_next_sibling(ac_w_node* n)
 {
-    ac_w_node *next = n->next_list;
+	return n->next_one;
+}
+
+void trie_node_set_next_sibling(ac_w_node* node, ac_w_node* next)
+{
+	node->next_one = next;
+}
+
+void trie_node_set_next_head(ac_w_node* node, ac_w_node* next)
+{
+	node->next_list = next;
+}
+
+ac_w_node* trie_node_lookup_children(ac_w_node* n, char ch)
+{
+    ac_w_node *next = trie_node_get_children_head(n);
     while(next)
     {
         if(next->key == ch)
             break;
-        next = next->next_one;
+        next = trie_node_get_next_sibling(next);
     }
     return next;
 }
 
-void set_next_node(ac_w_node* p_n, ac_w_node* c_n)
+void trie_node_set_children(ac_w_node* p_n, ac_w_node* c_n)
 {
-    ac_w_node *next = p_n->next_list;
+    ac_w_node *next = trie_node_get_children_head(p_n);
     if(next == NULL)
-        p_n->next_list = c_n;
+		trie_node_set_next_head(p_n, c_n);
     while(next)
     {
-        if(next->next_one == NULL)
+        if(trie_node_get_next_sibling(next) == NULL)
         {
-            next->next_one = c_n;
+			trie_node_set_next_sibling(next, c_n);
             break;
         }
-        next = next->next_one;
+		next = trie_node_get_next_sibling(next);
     }
 }
 
-ac_w_node* new_node(char key)
+ac_w_node* trie_node_new(char key)
 {
     ac_w_node* n = (ac_w_node*) malloc(sizeof(ac_w_node));
     if(!n)
@@ -85,72 +82,67 @@ ac_w_node* new_node(char key)
     n->key = key;
     n->is_final = 0;
     n->failure = NULL;
+	n->id = -1;
     return n;
 }
 
-int build_trie(char *str, ac_struct *ac)
+static inline int trie_node_get_key(ac_w_node* n)
 {
-    if(!ac || !ac->root) 
-        return -1;
+	return n->key;
+}
 
-    int i;
-    ac_w_node *n = ac->root;
-    ac_w_node *prev = NULL;
-    int len = strlen(str);
-    for(i = 0; i < len; i++)
+static inline int trie_node_is_final(ac_w_node* n)
+{
+	return n->is_final;
+}
+
+static inline ac_w_node* trie_node_get_failure(ac_w_node* n)
+{
+	return n->failure;
+}
+
+static inline char* trie_node_get_pattern(ac_w_node* n)
+{
+	return n->pattern;
+}
+
+static inline ac_w_data trie_node_get_data(ac_w_node* n)
+{
+	ac_w_data data;
+	data.pattern = n->pattern;
+	data.id = n->id;
+	return data;
+}
+
+void trie_node_free_children(ac_w_node *node)
+{
+    ac_w_node *e_n = trie_node_get_children_head(node);
+    ac_w_node *tmp = NULL;
+    while(e_n)
     {
-        prev = n;
-        n = get_next_node(n, str[i]);
-        if(!n)
-        {
-            n = new_node(str[i]);
-            if(!n)
-                return -1;
-            set_next_node(prev,n);
-        }
-        if( i == len -1)
-        {
-            if(n->is_final == 0)
-            {
-                n->is_final = 1;
-                n->pattern = (char*) malloc(len+1);
-                memcpy(n->pattern, str, len);
-                n->pattern[len] = '\0';
-            }
-            else
-            {
-                printf("Duplicate keyword \"%s\"\n", n->pattern);
-                //return -1;
-            }
-        }
+        trie_node_free_children(e_n);
+        tmp = trie_node_get_next_sibling(e_n);
+        free(trie_node_get_pattern(e_n));
+        free(e_n);
+        e_n = tmp;
     }
-    return 0;
 }
 
-int ac_load_search_key(char *str, ac_struct *acs)
-{
-    int ret = 0;
-    if(!acs || acs->is_finalized)
-        return -1;
-    ret = build_trie(str,acs);
-    return ret;
-}
-
-ac_w_node* get_suffix_node(char *str, ac_struct *acs)
+ac_w_node* trie_get_suffix_node(char *str, ac_struct *acs)
 {
     ac_w_node* n = acs->root;
     int len = strlen(str);
     int i;
     for(i = 0; i < len; i++)
     {
-        n = get_next_node(n, str[i]);
+        n = trie_node_lookup_children(n, str[i]);
         if(!n)
             break;
     }
     return n;
 }
 
-ac_w_node* get_failure_node(char *str, ac_struct *acs)
+ac_w_node* trie_get_longest_suffix(char *str, ac_struct *acs)
 {
     ac_w_node* failure = NULL;
     int len = strlen(str);
@@ -158,7 +150,7 @@ ac_w_node* get_failure_node(char *str, ac_struct *acs)
 
     for(i = 1; i < len; i++)
     {
-        failure = get_suffix_node(str + i, acs);
+        failure = trie_get_suffix_node(str + i, acs);
         if(failure)
             break;
     }
@@ -168,27 +160,104 @@ ac_w_node* get_failure_node(char *str, ac_struct *acs)
     return failure;
 }
 
-void dfs_traverse_node(ac_w_node *node, char *str, ac_struct *acs)
+void trie_set_failure(ac_w_node *node, char *str, ac_struct *acs)
 {
-    ac_w_node *e_n = node->next_list;
+    ac_w_node *e_n = trie_node_get_children_head(node);
     int len = strlen(str);
     char *s = (char*) malloc(sizeof(char) * len + 2);
     memcpy(s, str, len);
-    s[len] = node->key;
+    s[len] = trie_node_get_key(node);
     s[len+1] = '\0'; 
     while(e_n)
     {
-        dfs_traverse_node(e_n,s,acs);
-        e_n = e_n->next_one;
+        trie_set_failure(e_n,s,acs);
+        e_n = trie_node_get_next_sibling(e_n);
     }
-    node->failure = get_failure_node(s, acs);
+    node->failure = trie_get_longest_suffix(s, acs);
     free(s);
+}
+
+int trie_build(ac_w_data data, ac_struct *ac, int opt)
+{
+    if(!ac || !ac->root) 
+        return -1;
+
+    int i;
+    ac_w_node *n = ac->root;
+    ac_w_node *prev = NULL;
+    int len = strlen(data.pattern);
+	char* str = data.pattern;
+
+    for(i = 0; i < len; i++)
+    {
+        prev = n;
+        n = trie_node_lookup_children(n, str[i]);
+        if(!n)
+        {
+            n = trie_node_new(str[i]);
+            if(!n)
+                return -1;
+            trie_node_set_children(prev,n);
+        }
+        if( i == len -1)
+        {
+            if(n->is_final == 0)
+            {
+                n->is_final = 1;
+                n->pattern = (char*) malloc(len+1);
+                memcpy(n->pattern, data.pattern, len);
+                n->pattern[len] = '\0';
+				n->id = data.id;
+            }
+            else
+            {
+				if(opt == DUPKEY_ABORT)
+				{
+                	printf("Duplicate keyword \"%s\"\n", n->pattern);
+                	return -1;
+				}
+            }
+        }
+    }
+    return 0;
+}
+
+ac_struct* ac_new(void)
+{
+    ac_struct* ac = (ac_struct*) malloc(sizeof(ac_struct));
+    if(!ac)
+        return NULL;
+    ac->is_finalized = 0;
+    ac->counter = 0;
+    ac->root = (ac_w_node*) malloc(sizeof(ac_w_node));
+    if(!ac->root)
+    {
+        free(ac);
+        return NULL;
+    }
+    ac->root->next_list = NULL;
+    ac->root->next_one = NULL;
+    ac->root->failure = ac->root;
+    ac->root->key = 0;
+    ac->root->is_final = 0;
+    ac->current = ac->root;
+    
+    return ac;
+}
+
+int ac_load_search_key(ac_w_data data, ac_struct *acs, int opt)
+{
+    int ret = 0;
+    if(!acs || acs->is_finalized)
+        return -1;
+    ret = trie_build(data,acs,opt);
+    return ret;
 }
 
 void ac_build_failure_path(ac_struct *acs)
 {
     ac_w_node *n = acs->root;
-    dfs_traverse_node(n,"",acs);
+    trie_set_failure(n,"",acs);
 }
 
 int ac_finalize(ac_struct *acs)
@@ -198,28 +267,14 @@ int ac_finalize(ac_struct *acs)
     return 0;
 }
 
-void dfs_free_node(ac_w_node *node)
-{
-    ac_w_node *e_n = node->next_list;
-    ac_w_node *tmp = NULL;
-    while(e_n)
-    {
-        dfs_free_node(e_n);
-        tmp = e_n->next_one;
-        free(e_n->pattern);
-        free(e_n);
-        e_n = tmp;
-    }
-}
-
 void ac_free(ac_struct *acs)
 {
-    dfs_free_node(acs->root);
+    trie_node_free_children(acs->root);
     free(acs->root);
     free(acs);
 }
 
-int ac_search(char *str, ac_struct *acs, void (*call_back_f)(char* pattern, int pos))
+int ac_search(char *str, ac_struct *acs, void (*call_back_f)(ac_w_data data, int pos))
 {
     if(!acs || !acs->is_finalized)
         return -1;
@@ -233,21 +288,21 @@ int ac_search(char *str, ac_struct *acs, void (*call_back_f)(char* pattern, int 
             continue;
 
         acs->counter++;
-        n = get_next_node(acs->current, str[i]);
+        n = trie_node_lookup_children(acs->current, str[i]);
         if(n)
         {
             acs->current = n; 
 
-            if(n->failure->is_final) // hit, do something cool here
+			if(trie_node_is_final(trie_node_get_failure(acs->current))) // hit, do something cool here
             {
 				if(call_back_f)
-					(*call_back_f)(n->failure->pattern, acs->counter);
+					(*call_back_f)(trie_node_get_data(trie_node_get_failure(acs->current)), acs->counter);
             }
         
-            if(n->is_final) // hit, do something cool here
+            if(trie_node_is_final(acs->current)) // hit, do something cool here
             {
 				if(call_back_f)
-					(*call_back_f)(n->pattern, acs->counter);
+					(*call_back_f)(trie_node_get_data(acs->current), acs->counter);
             }
         }
         else
@@ -255,7 +310,7 @@ int ac_search(char *str, ac_struct *acs, void (*call_back_f)(char* pattern, int 
             if(acs->current == acs->root)
                 continue;
 
-            acs->current = acs->current->failure; 
+			acs->current = trie_node_get_failure(acs->current);
             acs->counter--;
             i--;
         }
