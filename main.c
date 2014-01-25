@@ -44,7 +44,7 @@ void user_print_user_result()
 
     while(key_st)
     {
-        printf("[hit]:(%d) %s (%d)\n", key_st->id, key_st->key_str, key_st->hit_cnt);
+        printf("[hit]:(id %d) %s (%d times)\n", key_st->id, key_st->key_str, key_st->hit_cnt);
         key_st = key_st->next;
     }
 }

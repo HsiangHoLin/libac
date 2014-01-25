@@ -293,12 +293,17 @@ int ac_search(char *str, ac_struct *acs, void (*call_back_f)(ac_w_data data, int
         {
             acs->current = n; 
 
-			if(trie_node_is_final(trie_node_get_failure(acs->current))) // hit, do something cool here
+            n = trie_node_get_failure(n);
+            while(n != acs->root) // trace all other failures untill root
             {
-				if(call_back_f)
-					(*call_back_f)(trie_node_get_data(trie_node_get_failure(acs->current)), acs->counter);
+                if(trie_node_is_final(n)) // hit, do something cool here
+                {
+				    if(call_back_f)
+					    (*call_back_f)(trie_node_get_data(n), acs->counter);
+                }
+                n = trie_node_get_failure(n);
             }
-        
+
             if(trie_node_is_final(acs->current)) // hit, do something cool here
             {
 				if(call_back_f)
